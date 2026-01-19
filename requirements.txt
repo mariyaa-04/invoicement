@@ -3,3 +3,14 @@ opencv-python
 Pillow
 numpy
 pytest
+paddleocr
+opencv-python
+pdf2image
+pillow
+ultralytics
+rapidfuzz
+numpy
+pandas
+pydantic
+regex
+matplotlib
