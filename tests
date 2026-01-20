@@ -1,0 +1,56 @@
+import os
+from pathlib import Path
+from utils.document_loader import load_document_as_images, standardize_ocr_output, validate_ocr_results
+from utils.layout_analysis import split_sections, detect_tables, associate_key_value
+from utils.candidate_extraction import find_candidates, extract_hp_candidates, extract_cost_candidates, KEYWORDS
+
+# Folder containing sample invoices
+SAMPLE_DIR = Path("data/sample_invoices/")
+
+# Mock PaddleOCR output for demo purposes
+def mock_paddleocr(image):
+    # Normally you would call PaddleOCR here
+    # This is a simplified example
+    return [
+        {"text": "Dealer ABC Tractors", "box": [[50, 50], [200, 50], [200, 70], [50, 70]], "score": 0.95, "page_num": 1},
+        {"text": "HP 50", "box": [[50, 100], [100, 100], [100, 120], [50, 120]], "score": 0.98, "page_num": 1},
+        {"text": "Cost 150000", "box": [[50, 150], [150, 150], [150, 170], [50, 170]], "score": 0.97, "page_num": 1},
+        {"text": "Model X1", "box": [[50, 200], [120, 200], [120, 220], [50, 220]], "score": 0.96, "page_num": 1}
+    ]
+
+def process_invoice(file_path):
+    images = load_document_as_images(file_path)
+    ocr_output = []
+    for img in images:
+        ocr_output.extend(mock_paddleocr(img))
+    standardized = standardize_ocr_output(ocr_output)
+    validated = validate_ocr_results(standardized, min_confidence=0.5)
+    sections = split_sections(validated, page_height=1000)
+    sections.tables = detect_tables(sections.body)
+    candidates = {}
+    for field, keywords in KEYWORDS.items():
+        field_candidates = find_candidates(validated, keywords)
+        if field == "HP":
+            field_candidates = extract_hp_candidates(field_candidates)
+        elif field == "cost":
+            field_candidates = extract_cost_candidates(field_candidates)
+        candidates[field] = field_candidates
+    return sections, candidates
+
+def main():
+    invoice_files = list(SAMPLE_DIR.glob("*.*"))
+    for file_path in invoice_files:
+        sections, candidates = process_invoice(file_path)
+        print(f"Invoice: {file_path.name}")
+        print("Header:", [w.text for w in sections.header])
+        print("Body:", [w.text for w in sections.body])
+        print("Footer:", [w.text for w in sections.footer])
+        print("Tables:")
+        for table in sections.tables:
+            print([associate_key_value(table)])
+        print("Candidates:", candidates)
+        print("="*50)
+
+if __name__ == "__main__":
+    main()
+
